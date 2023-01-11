@@ -1,7 +1,9 @@
 package web
 
 import (
+	"fmt"
 	"regexp"
+	"strings"
 )
 
 type router struct {
@@ -24,13 +26,75 @@ func newRouter() router {
 // - 不能在同一个位置同时注册通配符路由和参数路由，例如 /user/:id 和 /user/* 冲突
 // - 同名路径参数，在路由匹配的时候，值会被覆盖。例如 /user/:id/abc/:id，那么 /user/123/abc/456 最终 id = 456
 func (r *router) addRoute(method string, path string, handler HandleFunc) {
-	panic("implement me")
+	//多个判断处理， 把空， 开头非/， 结尾为/的情况排除
+	if path == "" {
+		panic("web: 路由是空字符串")
+	}
+	if path[0] != '/' {
+		panic("web 路由开头必须是/")
+	}
+	if path != "/" && path[len(path)-1] == '/' {
+		panic("web 路由结尾不能为/")
+	}
+	//先获取根节点下面的方法
+	root, ok := r.trees[method]
+	if !ok {
+		//没有就创建该方法的根节点
+		root = &node{path: "/"}
+		r.trees[method] = root
+	}
+	if path == "/" {
+		if root.handler != nil {
+			panic("web 路由冲突，已经存在该节点")
+		}
+		root.handler = handler
+		return
+	}
+	//处理路由 /user/home的情况
+	segs := strings.Split(path[1:], "/")
+	for _, seg := range segs {
+		if seg == "" {
+			panic("web 路由的url不能为空， /a///b")
+		}
+		root = root.childOrCreate(seg)
+	}
+	if root.handler != nil {
+		panic(fmt.Sprintf("路由冲突，已存在该路由 %s", path))
+	}
+	root.handler = handler
 }
 
 // findRoute 查找对应的节点
 // 注意，返回的 node 内部 HandleFunc 不为 nil 才算是注册了路由
 func (r *router) findRoute(method string, path string) (*matchInfo, bool) {
-	panic("implement me")
+	//先处理根节点， 再剪切路由处理
+	root, ok := r.trees[method]
+	if !ok {
+		return nil, false
+	}
+	if path == "/" {
+		return &matchInfo{n: root}, true
+	}
+
+	segs := strings.Split(strings.Trim(path, "/"), "/")
+	mi := &matchInfo{}
+	for _, seg := range segs {
+		var child *node
+		child, ok = root.childOf(seg)
+		if !ok {
+			if root.typ == nodeTypeAny {
+				mi.n = root
+				return mi, true
+			}
+			return nil, false
+		}
+		if child.paramName != "" {
+			mi.addValue(child.paramName, seg)
+		}
+		root = child
+	}
+	mi.n = root
+	return mi, true
 }
 
 type nodeType int
@@ -78,8 +142,27 @@ type node struct {
 // child 返回子节点
 // 第一个返回值 *node 是命中的节点
 // 第二个返回值 bool 代表是否命中
-func (n *node) childOf(path string) (*node, bool) {
-	panic("implement me")
+func (n *node) childOf(seg string) (*node, bool) {
+	if n.children == nil {
+		return n.childOfNonStatic(seg)
+	}
+	res, ok := n.children[seg]
+	if !ok {
+		return n.childOfNonStatic(seg)
+	}
+	return res, ok
+}
+
+func (n *node) childOfNonStatic(path string) (*node, bool) {
+	if n.regChild != nil {
+		if n.regChild.regExpr.Match([]byte(path)) {
+			return n.regChild, true
+		}
+	}
+	if n.paramChild != nil {
+		return n.paramChild, true
+	}
+	return n.starChild, n.starChild != nil
 }
 
 // childOrCreate 查找子节点，
@@ -88,7 +171,89 @@ func (n *node) childOf(path string) (*node, bool) {
 // 最后会从 children 里面查找，
 // 如果没有找到，那么会创建一个新的节点，并且保存在 node 里面
 func (n *node) childOrCreate(path string) *node {
-	panic("implement me")
+	//1 判断通配符的情况， 过滤其他情况
+	if path == "*" {
+		if n.paramChild != nil {
+			panic(fmt.Sprintf("在参数路径路由存在的情况下， 不能添加通配符 %s", path))
+		}
+		if n.regChild != nil {
+			panic(fmt.Sprintf("在正则路径路由存在的情况下， 不能添加通配符 %s", path))
+		}
+		if n.starChild == nil {
+			n.starChild = &node{path: path, typ: nodeTypeAny}
+		}
+		return n.starChild
+	}
+	//2 判断参数路径和正则要方法一起处理
+	if path[0] == ':' {
+		paramName, expre, isReg := n.parseParam(path)
+		if isReg {
+			return n.childOrCreateReg(path, expre, paramName)
+		}
+		return n.childOrCreateParam(path, paramName)
+	}
+	//静态路由的情况
+	if n.children == nil {
+		n.children = make(map[string]*node)
+	}
+	child, ok := n.children[path]
+	if !ok {
+		child = &node{path: path, typ: nodeTypeStatic}
+		n.children[path] = child
+	}
+	return child
+}
+
+func (n *node) childOrCreateParam(path string, paramName string) *node {
+
+	if n.regChild != nil {
+		panic(fmt.Sprintf("在正则路径路由存在的情况下， 不能添加通配符 %s", path))
+	}
+	if n.starChild != nil {
+		panic(fmt.Sprintf("在参数路径路由存在的情况下， 不能添加通配符 %s", path))
+	}
+	if n.paramChild != nil {
+		if n.paramChild.path != path {
+			panic(fmt.Sprintf("路由冲突， 参数路由冲突， 已经有%s, 新注册%s", n.paramChild.path, path))
+		}
+	} else {
+		n.paramChild = &node{path: path, paramName: paramName, typ: nodeTypeParam}
+	}
+	return n.paramChild
+}
+
+func (n *node) childOrCreateReg(path string, expr string, paramName string) *node {
+	if n.starChild != nil {
+		panic(fmt.Sprintf("在参数路径路由存在的情况下， 不能添加通配符 %s", path))
+	}
+	if n.paramChild != nil {
+		panic(fmt.Sprintf("在参数路径路由存在的情况下， 不能添加通配符 %s", path))
+	}
+	if n.regChild != nil {
+		if n.regChild.regExpr.String() != expr || n.paramName != paramName {
+			panic(fmt.Sprintf("路由冲突， 正则路由冲突， 已经有%s, 新注册%s", n.paramChild.path, path))
+		}
+	} else {
+		regExpr, err := regexp.Compile(expr)
+		if err != nil {
+			panic(fmt.Sprintf("正则错误 %s", err))
+		}
+		n.regChild = &node{path: path, paramName: paramName, regExpr: regExpr, typ: nodeTypeReg}
+	}
+	return n.regChild
+}
+
+func (n *node) parseParam(path string) (string, string, bool) {
+	path = path[1:]
+	// /reg/:id(^.+$)
+	segs := strings.SplitN(path, "(", 2)
+	if len(segs) == 2 {
+		expr := segs[1] //^.+$)
+		if strings.HasSuffix(expr, ")") {
+			return segs[0], expr[:len(expr)-1], true
+		}
+	}
+	return path, "", false
 }
 
 type matchInfo struct {
