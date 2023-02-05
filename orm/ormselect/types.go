@@ -1,4 +1,4 @@
-package ormselect1
+package ormselect
 
 import (
 	"context"
@@ -15,7 +15,7 @@ type Excecutor interface {
 }
 
 type QueryBuilder interface {
-	Build() (Query error)
+	Build() (*Query, error)
 }
 
 type Query struct {
