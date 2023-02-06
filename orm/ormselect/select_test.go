@@ -50,6 +50,42 @@ func TestSelectBuildFun(t *testing.T) {
 			},
 			wantErr: nil,
 		},
+		{
+			name:    "select where eq",
+			builder: (&Selector[TestModel]{}).From("`TestModel`").Where(C("id").Eq(2)),
+			wantQuery: &Query{
+				SQL:  "SELECT * FROM `TestModel` WHERE `id` = ?;",
+				Args: []any{2},
+			},
+			wantErr: nil,
+		},
+		{
+			name:    "select where not",
+			builder: (&Selector[TestModel]{}).From("`TestModel`").Where(Not(C("id").Eq(2))),
+			wantQuery: &Query{
+				SQL:  "SELECT * FROM `TestModel` WHERE  NOT (`id` = ?);",
+				Args: []any{2},
+			},
+			wantErr: nil,
+		},
+		{
+			name:    "select where and",
+			builder: (&Selector[TestModel]{}).From("`TestModel`").Where(C("id").Eq(2).And(C("name").Eq("tom"))),
+			wantQuery: &Query{
+				SQL:  "SELECT * FROM `TestModel` WHERE (`id` = ?) AND (`name` = ?);",
+				Args: []any{2, "tom"},
+			},
+			wantErr: nil,
+		},
+		{
+			name:    "select where or",
+			builder: (&Selector[TestModel]{}).From("`TestModel`").Where(C("id").Eq(2).Or(C("name").Eq("tom"))),
+			wantQuery: &Query{
+				SQL:  "SELECT * FROM `TestModel` WHERE (`id` = ?) OR (`name` = ?);",
+				Args: []any{2, "tom"},
+			},
+			wantErr: nil,
+		},
 	}
 
 	for _, tc := range testCase {
