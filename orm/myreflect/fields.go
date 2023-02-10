@@ -1,13 +1,29 @@
 package myreflect
 
 import (
+	"errors"
 	"reflect"
 )
 
+// 其目的在于遍历struct结构的属性
 func IterateFields(entity any) (map[string]any, error) {
+	if entity == nil {
+		return nil, errors.New("入参不能为nil")
+	}
 	//1. 用type value方法提取类型和值对象
 	typ := reflect.TypeOf(entity)
 	val := reflect.ValueOf(entity)
+	if val.IsZero() { // （*user)(nil)
+		return nil, errors.New("其值不能为nil指向")
+	}
+	//1.1 增加如果入参是指针的情况, 不管多少层指针
+	for typ.Kind() == reflect.Pointer {
+		typ = typ.Elem()
+		val = val.Elem()
+	}
+	if typ.Kind() != reflect.Struct {
+		return nil, errors.New("入参需指向结构体")
+	}
 	//2. 提取数目， 方便用for循环
 	numFields := typ.NumField()
 	res := make(map[string]any, numFields)
