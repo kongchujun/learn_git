@@ -39,3 +39,17 @@ func IterateFields(entity any) (map[string]any, error) {
 	}
 	return res, nil
 }
+
+// 可以设置struct
+func SetField(entity any, field string, newval any) error {
+	val := reflect.ValueOf(entity)
+	for val.Type().Kind() == reflect.Pointer {
+		val = val.Elem()
+	}
+	fieldVal := val.FieldByName(field)
+	if !fieldVal.CanSet() {
+		return errors.New("不能设置")
+	}
+	fieldVal.Set(reflect.ValueOf(newval))
+	return nil
+}

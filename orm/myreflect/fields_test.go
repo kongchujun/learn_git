@@ -86,3 +86,65 @@ func TestFields(t *testing.T) {
 		})
 	}
 }
+
+func TestSetField(t *testing.T) {
+	type User struct {
+		Name string
+		age  int
+	}
+	testCase := []struct {
+		name   string
+		entity any
+		field  string
+		newval any
+
+		wantEntity any
+
+		wantErr error
+	}{
+		{
+			name: "pointer",
+			entity: &User{
+				Name: "tom",
+			},
+			field:  "Name",
+			newval: "jeck",
+
+			wantEntity: &User{
+				Name: "jeck",
+			},
+			wantErr: nil,
+		},
+
+		{
+			name: "struct",
+			entity: User{
+				Name: "tom",
+			},
+			field:   "Name",
+			newval:  "jeck",
+			wantErr: errors.New("不能设置"),
+		},
+		{
+			name: "private ",
+			entity: User{
+				age: 18,
+			},
+			field:   "age",
+			newval:  19,
+			wantErr: errors.New("不能设置"),
+		},
+	}
+
+	for _, tc := range testCase {
+		t.Run(tc.name, func(t *testing.T) {
+			err := SetField(tc.entity, tc.field, tc.newval)
+			assert.Equal(t, tc.wantErr, err)
+			if err != nil {
+				return
+			}
+			assert.Equal(t, tc.entity, tc.wantEntity)
+
+		})
+	}
+}
