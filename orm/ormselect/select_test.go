@@ -18,7 +18,7 @@ func TestSelectBuildFun(t *testing.T) {
 			name:    "select with name",
 			builder: &Selector[TestModel]{},
 			wantQuery: &Query{
-				SQL:  "SELECT * FROM `TestModel`;",
+				SQL:  "SELECT * FROM `test_model`;",
 				Args: nil,
 			},
 			wantErr: nil,
@@ -36,7 +36,7 @@ func TestSelectBuildFun(t *testing.T) {
 			name:    "select no name",
 			builder: (&Selector[TestModel]{}).From(""),
 			wantQuery: &Query{
-				SQL:  "SELECT * FROM `TestModel`;",
+				SQL:  "SELECT * FROM `test_model`;",
 				Args: nil,
 			},
 			wantErr: nil,
@@ -52,36 +52,36 @@ func TestSelectBuildFun(t *testing.T) {
 		},
 		{
 			name:    "select where eq",
-			builder: (&Selector[TestModel]{}).From("`TestModel`").Where(C("id").Eq(2)),
+			builder: (&Selector[TestModel]{}).Where(C("Id").Eq(2)),
 			wantQuery: &Query{
-				SQL:  "SELECT * FROM `TestModel` WHERE `id` = ?;",
+				SQL:  "SELECT * FROM `test_model` WHERE `id` = ?;",
 				Args: []any{2},
 			},
 			wantErr: nil,
 		},
 		{
 			name:    "select where not",
-			builder: (&Selector[TestModel]{}).From("`TestModel`").Where(Not(C("id").Eq(2))),
+			builder: (&Selector[TestModel]{}).Where(Not(C("Id").Eq(2))),
 			wantQuery: &Query{
-				SQL:  "SELECT * FROM `TestModel` WHERE  NOT (`id` = ?);",
+				SQL:  "SELECT * FROM `test_model` WHERE  NOT (`id` = ?);",
 				Args: []any{2},
 			},
 			wantErr: nil,
 		},
 		{
 			name:    "select where and",
-			builder: (&Selector[TestModel]{}).From("`TestModel`").Where(C("id").Eq(2).And(C("name").Eq("tom"))),
+			builder: (&Selector[TestModel]{}).Where(C("Id").Eq(2).And(C("FirstName").Eq("tom"))),
 			wantQuery: &Query{
-				SQL:  "SELECT * FROM `TestModel` WHERE (`id` = ?) AND (`name` = ?);",
+				SQL:  "SELECT * FROM `test_model` WHERE (`id` = ?) AND (`first_name` = ?);",
 				Args: []any{2, "tom"},
 			},
 			wantErr: nil,
 		},
 		{
 			name:    "select where or",
-			builder: (&Selector[TestModel]{}).From("`TestModel`").Where(C("id").Eq(2).Or(C("name").Eq("tom"))),
+			builder: (&Selector[TestModel]{}).Where(C("Id").Eq(2).Or(C("FirstName").Eq("tom"))),
 			wantQuery: &Query{
-				SQL:  "SELECT * FROM `TestModel` WHERE (`id` = ?) OR (`name` = ?);",
+				SQL:  "SELECT * FROM `test_model` WHERE (`id` = ?) OR (`first_name` = ?);",
 				Args: []any{2, "tom"},
 			},
 			wantErr: nil,

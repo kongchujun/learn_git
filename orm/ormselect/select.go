@@ -3,8 +3,8 @@ package ormselect
 import (
 	"context"
 	"database/sql"
-	"fmt"
-	"reflect"
+
+	// errs "learn_git/orm/ormselect/internal/err"
 	"strings"
 )
 
@@ -14,9 +14,8 @@ import (
 // s *Selector ormselect.Excecutor
 type Selector[T any] struct {
 	table string
-	sb    *strings.Builder
 	where []Predicat
-	args  []any
+	buidler[T]
 }
 
 func (s *Selector[T]) Get(ctx context.Context) (*T, error) {
@@ -29,13 +28,17 @@ func (s *Selector[T]) GetMuti(ctx context.Context) ([]*T, error) {
 func (s *Selector[T]) Build() (*Query, error) {
 	s.sb = &strings.Builder{}
 	sb := s.sb
+	var err error
+	s.model, err = parseModel(new(T))
+	if err != nil {
+		return nil, err
+	}
 	sb.WriteString("SELECT * FROM ")
 
 	if s.table == "" {
-		var t T
-		typ := reflect.TypeOf(t)
+
 		sb.WriteByte('`')
-		sb.WriteString(typ.Name())
+		sb.WriteString(s.model.tableName)
 		sb.WriteByte('`')
 	} else {
 		//``this logo handled by user
@@ -58,47 +61,6 @@ func (s *Selector[T]) Build() (*Query, error) {
 		SQL:  sb.String(),
 		Args: s.args,
 	}, nil
-}
-
-func (s *Selector[T]) buildExpressionBuilder(expr Expression) error {
-	switch exp := expr.(type) {
-	case nil:
-	case Predicat:
-		_, ok := exp.left.(Predicat)
-		if ok {
-			s.sb.WriteByte('(')
-		}
-		if err := s.buildExpressionBuilder(exp.left); err != nil {
-			return err
-		}
-		if ok {
-			s.sb.WriteByte(')')
-		}
-		s.sb.WriteByte(' ')
-		s.sb.WriteString(exp.op.String())
-		s.sb.WriteByte(' ')
-
-		_, ok = exp.right.(Predicat)
-		if ok {
-			s.sb.WriteByte('(')
-		}
-		if err := s.buildExpressionBuilder(exp.right); err != nil {
-			return err
-		}
-		if ok {
-			s.sb.WriteByte(')')
-		}
-	case Column:
-		s.sb.WriteByte('`')
-		s.sb.WriteString(exp.name)
-		s.sb.WriteByte('`')
-	case value:
-		s.sb.WriteString("?")
-		s.args = append(s.args, exp.val)
-	default:
-		return fmt.Errorf("orm: 不支持模块 %v", expr)
-	}
-	return nil
 }
 
 func (s *Selector[T]) Exec(ctx context.Context) (sql.Result, error) {
