@@ -20,7 +20,8 @@ type BuildInMapCache struct {
 
 func NewBuildInMapCache(interval time.Duration) *BuildInMapCache {
 	res := &BuildInMapCache{
-		data: make(map[string]*item, 100),
+		data:  make(map[string]*item, 100),
+		close: make(chan struct{}),
 	}
 	go func() {
 		ticker := time.NewTicker(interval)
