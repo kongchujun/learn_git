@@ -47,7 +47,7 @@ func NewBuildInMapCache(interval time.Duration, opts ...BuildInMapCacheOption) *
 						break
 					}
 					if !val.deadline.IsZero() && val.deadline.Before(t) {
-						delete(res.data, key)
+						res.delete(key)
 					}
 				}
 				res.mutex.Unlock()
@@ -75,7 +75,7 @@ func (b *BuildInMapCache) Get(ctx context.Context, key string) (any, error) {
 			return nil, fmt.Errorf("%w:%s", errKeyNotFound, key)
 		}
 		if res.deadlineBefore(now) {
-			delete(b.data, key)
+			b.delete(key)
 			return nil, fmt.Errorf("%w:%s", errKeyNotFound, key)
 		}
 		return res, nil
@@ -93,10 +93,19 @@ func (b *BuildInMapCache) Set(ctx context.Context, key string, val any, expirati
 	return nil
 }
 
+func (b *BuildInMapCache) delete(key string) {
+	itm, ok := b.data[key]
+	if !ok {
+		return
+	}
+	delete(b.data, key)
+	b.onEvicted(key, itm.val)
+}
+
 func (b *BuildInMapCache) Delete(ctx context.Context, key string) error {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
-	delete(b.data, key)
+	b.delete(key)
 	return nil
 }
 
