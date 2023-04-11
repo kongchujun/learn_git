@@ -13,15 +13,27 @@ var (
 )
 
 type BuildInMapCache struct {
-	data  map[string]*item
-	mutex sync.RWMutex
-	close chan struct{}
+	data      map[string]*item
+	mutex     sync.RWMutex
+	close     chan struct{}
+	onEvicted func(key string, val any)
 }
 
-func NewBuildInMapCache(interval time.Duration) *BuildInMapCache {
+type BuildInMapCacheOption func(cache *BuildInMapCache)
+
+func BuildInMapCacheWithOnEvictedFunc(fn func(key string, val any)) BuildInMapCacheOption {
+	return func(cache *BuildInMapCache) {
+		cache.onEvicted = fn
+	}
+}
+
+func NewBuildInMapCache(interval time.Duration, opts ...BuildInMapCacheOption) *BuildInMapCache {
 	res := &BuildInMapCache{
 		data:  make(map[string]*item, 100),
 		close: make(chan struct{}),
+	}
+	for _, opt := range opts {
+		opt(res)
 	}
 	go func() {
 		ticker := time.NewTicker(interval)
